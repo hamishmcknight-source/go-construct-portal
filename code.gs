@@ -1009,14 +1009,17 @@ function headerBar_(role, titleRight) {
 }
 
 function buildToastRedirectPage_(message, redirectUrl) {
+  const safeUrl = safeReturnUrl_(redirectUrl || buildUrl_('home', {}));
   const msgJson = JSON.stringify(message || '');
-  const urlJson = JSON.stringify(redirectUrl || buildUrl_('home', {}));
+  const urlJson = JSON.stringify(safeUrl);
+  const urlEsc  = escapeHtml_(safeUrl);
   return `
 <!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="0;url=${urlEsc}">
 ${sharedStyles_('home')}
 ${appFeelScript_()}
 </head>
@@ -1029,6 +1032,7 @@ ${appFeelScript_()}
   })();
 </script>
 <div style="padding:18px;font-weight:800;">Redirecting…</div>
+<div class="small" style="padding:0 18px;">If nothing happens, <a href="${urlEsc}">tap here</a>.</div>
 </body>
 </html>`;
 }
