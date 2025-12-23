@@ -1011,14 +1011,12 @@ function headerBar_(role, titleRight) {
 function buildToastRedirectPage_(message, redirectUrl) {
   const msgJson = JSON.stringify(message || '');
   const urlJson = JSON.stringify(redirectUrl || buildUrl_('home', {}));
-  const safeUrl = redirectUrl || buildUrl_('home', {});
   return `
 <!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="refresh" content="0;url=${escapeHtml_(safeUrl)}">
 ${sharedStyles_('home')}
 ${appFeelScript_()}
 </head>
@@ -1028,11 +1026,9 @@ ${appFeelScript_()}
     try{ sessionStorage.setItem('GCFlash', ${msgJson}); }catch(e){}
     var url = ${urlJson} || '${escapeHtml_(buildUrl_('home', {}))}';
     try{ window.location.replace(url); }catch(err){ window.location.href = url; }
-    setTimeout(function(){ try{ window.location.href = url; }catch(e){} }, 600);
   })();
 </script>
 <div style="padding:18px;font-weight:800;">Redirecting…</div>
-<div class="small" style="padding:0 18px 12px;">If nothing happens, <a href="${escapeHtml_(safeUrl)}" target="_self">tap here</a>.</div>
 </body>
 </html>`;
 }
