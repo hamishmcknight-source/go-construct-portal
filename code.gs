@@ -603,7 +603,7 @@ if (mode === 'worker') {
   }
   // ABSOLUTE SAFETY NET — never return nothing
 return HtmlService
-  .createHtmlOutput(renderCustomerPortal_())
+  .createHtmlOutput(buildMessagePage_('Something went wrong. Please go back and try again.', { backUrl: buildUrl_('home', {}) }))
   .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 
 }
@@ -617,9 +617,10 @@ function doPost(e) {
     if (action === 'customerNewJob') {
       const jobId = handleCustomerNewJob(e);
       const email = (params.customerEmail || '').toString().trim();
-      html = buildCustomerConfirmationPage_(email, jobId);
+      const redirectUrl = buildUrl_('customer', { email: email });
+      html = buildToastRedirectPage_('Job sent to the team (' + jobId + ').', redirectUrl);
       return HtmlService.createHtmlOutput(wrapHtmlNoCache_(html))
-        .setTitle(COMPANY.name + ' — Job Created')
+        .setTitle(COMPANY.name + ' — Redirecting')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
 
@@ -627,27 +628,33 @@ function doPost(e) {
     if (action === 'customerUpdateJob') {
       const jobId = handleCustomerUpdateJob(e);
       const email = (params.customerEmail || params.email || '').toString().trim();
-      html = buildMessagePage_('Job updated for <strong>' + escapeHtml_(jobId) + '</strong>.', { backUrl: buildUrl_('customer', { email: email }) });
+      const redirectUrl = buildUrl_('customer', { email: email });
+      html = buildToastRedirectPage_('Job updated (' + jobId + ').', redirectUrl);
       return HtmlService.createHtmlOutput(wrapHtmlNoCache_(html))
-        .setTitle(COMPANY.name + ' — Job Updated')
+        .setTitle(COMPANY.name + ' — Redirecting')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
 
     if (action === 'customerAddPhotos') {
       const jobId = handleCustomerAddPhotos(e);
       const email = (params.customerEmail || params.email || '').toString().trim();
-      html = buildMessagePage_('Photos added to job <strong>' + escapeHtml_(jobId) + '</strong>.', { backUrl: buildUrl_('customer', { email: email }) });
+      const redirectUrl = buildUrl_('customer', { email: email });
+      html = buildToastRedirectPage_('Photos added to job ' + jobId + '.', redirectUrl);
       return HtmlService.createHtmlOutput(wrapHtmlNoCache_(html))
-        .setTitle(COMPANY.name + ' — Photos Added')
+        .setTitle(COMPANY.name + ' — Redirecting')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
 
 if (action === 'workerUpdateJob') {
       handleWorkerUpdateJob(e);
       const jobId = (params.jobId || '').toString().trim();
-      html = buildWorkerConfirmationPage_(jobId, (params.role || 'worker'));
+      const role = (params.role || 'worker');
+      const redirectUrl = role === 'manager'
+        ? buildUrl_('managerJob', { jobId: jobId })
+        : buildUrl_('worker', { jobId: jobId });
+      html = buildToastRedirectPage_('Job update saved (' + jobId + ').', redirectUrl);
       return HtmlService.createHtmlOutput(wrapHtmlNoCache_(html))
-        .setTitle(COMPANY.name + ' — Job Updated')
+        .setTitle(COMPANY.name + ' — Redirecting')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
 
@@ -664,11 +671,13 @@ if (action === 'workerUpdateJob') {
       const subject = 'Invoice ' + invoiceId + ' for your recent ' + COMPANY.name + ' job';
 
       const pdfUrl = 'https://drive.google.com/file/d/' + pdfFileId + '/preview';
+      const portalUrl = buildUrl_('invoiceView', { jobId: jobId, email: emailTo });
 
       const bodyText =
         'Hi,\n\n' +
         'Thanks again for asking the ' + COMPANY.name + ' team to help with your recent job.\n\n' +
         'Invoice: ' + invoiceId + '\n' +
+        'Portal view (keeps the app style): ' + portalUrl + '\n' +
         'PDF link: ' + pdfUrl + '\n\n' +
         'Please make payment within ' + COMPANY.paymentTermsDays + ' days using the invoice number as the payment reference.\n\n' +
         'If anything doesn’t look right, just reply to this email.\n\n' +
@@ -679,7 +688,9 @@ if (action === 'workerUpdateJob') {
         '<p>Hi,</p>' +
         '<p>Thanks again for asking the <strong>' + COMPANY.name + '</strong> team to help with your recent job.</p>' +
         '<p><strong>Invoice:</strong> ' + invoiceId + '<br>' +
+        '<strong>Portal view:</strong> <a href="' + portalUrl + '">Open invoice (same tab style)</a><br>' +
         '<strong>PDF:</strong> <a href="' + pdfUrl + '">View invoice PDF</a></p>' +
+        '<p>Use the portal link above from your iPhone, Android, or desktop browser to keep everything in one tab with the portal styling.</p>' +
         '<p>Please make payment within <strong>' + COMPANY.paymentTermsDays + ' days</strong> using the invoice number as the payment reference.</p>' +
         '<p>If anything doesn’t look right, just reply to this email.</p>' +
         '<p>All the best,<br>' + COMPANY.name + '</p>';
@@ -704,9 +715,10 @@ if (action === 'workerUpdateJob') {
         'Draft created in Gmail for <strong>' + emailTo + '</strong> with invoice PDF attached.<br><br>' +
         'Open Gmail → <strong>Drafts</strong> and look for subject: <strong>' + subject + '</strong>.';
 
-      html = buildMessagePage_(msg, { backUrl: buildUrl_('manager', {}) });
+      const redirectUrl = buildUrl_('manager', {});
+      html = buildToastRedirectPage_('Draft created for ' + emailTo + '.', redirectUrl);
       return HtmlService.createHtmlOutput(wrapHtmlNoCache_(html))
-        .setTitle(COMPANY.name + ' — Draft Created')
+        .setTitle(COMPANY.name + ' — Redirecting')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
 
@@ -996,6 +1008,31 @@ function headerBar_(role, titleRight) {
 </div>`;
 }
 
+function buildToastRedirectPage_(message, redirectUrl) {
+  const msgJson = JSON.stringify(message || '');
+  const urlJson = JSON.stringify(redirectUrl || buildUrl_('home', {}));
+  return `
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+${sharedStyles_('home')}
+${appFeelScript_()}
+</head>
+<body>
+<script>
+  (function(){
+    try{ sessionStorage.setItem('GCFlash', ${msgJson}); }catch(e){}
+    var url = ${urlJson} || '${escapeHtml_(buildUrl_('home', {}))}';
+    try{ window.location.replace(url); }catch(err){ window.location.href = url; }
+  })();
+</script>
+<div style="padding:18px;font-weight:800;">Redirecting…</div>
+</body>
+</html>`;
+}
+
 
 function appFeelScript_() {
   // Lightweight mobile "app feel": toast + disable double-taps + scroll-to-error.
@@ -1019,6 +1056,22 @@ function appFeelScript_() {
       t.classList.add('show');
       setTimeout(function(){ t.classList.remove('show'); }, ms || 1600);
     }catch(e){}
+  };
+
+  function playFlash(){
+    try{
+      var msg = sessionStorage.getItem('GCFlash');
+      if (msg){
+        sessionStorage.removeItem('GCFlash');
+        window.GCToast(msg, 2000);
+      }
+    }catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded', playFlash);
+
+  window.GCFlashAndGo = function(msg, url){
+    try{ sessionStorage.setItem('GCFlash', msg || ''); }catch(e){}
+    try{ window.location.replace(url); }catch(e){ window.location.href = url; }
   };
 
   // Enhance forms: prevent double-tap + show toast.
@@ -1928,82 +1981,6 @@ ${headerBar_('home', '')}
 </div>
 
 <a class="btn btn-secondary" href="${backUrl}" target="_self">Back</a>
-</body>
-</html>`;
-}
-
-function buildCustomerConfirmationPage_(email, jobId) {
-  const redirectUrl = buildUrl_('customer', { email: email || '' });
-  const msg = 'Your job has been sent to the team.<br>' +
-              'Reference: <strong>' + escapeHtml_(jobId) + '</strong><br>' +
-              (email ? 'We’ll keep you updated at <strong>' + escapeHtml_(email) + '</strong>.' : '');
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml_(COMPANY.name)} — Job Created</title>
-${sharedStyles_('customer')}
-${appFeelScript_()}
-${appFeelScript_()}
-<script>
-document.addEventListener('DOMContentLoaded', function(){
-  setTimeout(function(){
-    try { window.location.href = ${JSON.stringify(redirectUrl)}; } catch(e) {}
-  }, 3000);
-});
-</script>
-</head>
-<body>
-${headerBar_('customer', 'Job created')}
-
-<div class="card" style="text-align:center;">
-  <div style="width:64px;height:64px;border-radius:999px;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;
-              color:#fff;font-size:34px;font-weight:900;background:#43a047;">✓</div>
-  <h1 style="margin:6px 0 2px;">Job created</h1>
-  <div class="small" style="margin-bottom:10px;">Returning to your portal…</div>
-  <div style="font-size:15px;">${msg}</div>
-</div>
-
-<a class="btn" href="${redirectUrl}" target="_self">View my portal</a>
-
-${bottomNav_('customer', {email: email || ''})}
-</body>
-</html>`;
-}
-
-
-function buildWorkerConfirmationPage_(jobId, role) {
-  role = role || 'worker';
-  const redirectUrl = role === 'manager'
-    ? buildUrl_('managerJob', { jobId: jobId })
-    : buildUrl_('worker', { jobId: jobId });
-
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml_(COMPANY.name)} — Job Updated</title>
-${sharedStyles_(role)}
-<script>
-  setTimeout(function(){ window.location.href = ${JSON.stringify(redirectUrl)}; }, 1000);
-</script>
-</head>
-<body>
-${headerBar_(role, 'Saved')}
-
-<div class="card" style="text-align:center;">
-  <div style="width:64px;height:64px;border-radius:999px;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;
-              color:#fff;font-size:34px;font-weight:900;background:#43a047;">✓</div>
-  <h1 style="margin:6px 0 2px;">Saved</h1>
-  <div class="small" style="margin-bottom:10px;">Returning…</div>
-  <div style="font-size:15px;">Update saved for job <strong>${escapeHtml_(jobId)}</strong>.</div>
-</div>
-
-<a class="btn" href="${redirectUrl}" target="_self">Back to job</a>
 </body>
 </html>`;
 }
